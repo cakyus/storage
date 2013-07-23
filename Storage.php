@@ -25,4 +25,12 @@ class Storage {
 	public function del($key) {
 		
 	}
+	
+	public function fetch() {
+		
+	}
+	
+	public function clear() {
+		
+	}
 }
