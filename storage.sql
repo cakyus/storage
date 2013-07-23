@@ -1,0 +1,14 @@
+PRAGMA foreign_keys=OFF;
+BEGIN TRANSACTION;
+CREATE TABLE object_store (
+	  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+	, name TEXT NOT NULL UNIQUE
+);
+CREATE TABLE object_data (
+	  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+	, object_store_id INTEGER NOT NULL
+	, key_value BLOB DEFAULT NULL
+	, data BLOB NOT NULL
+	, UNIQUE (object_store_id, key_value)
+);
+COMMIT;
