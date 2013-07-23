@@ -24,16 +24,16 @@ class Storage {
 			,SQLITE3_OPEN_READWRITE
 			);
 		
-		$query = $this->db->querySingle(
-			 ' SELECT id FROM object_store'
-			.' WHERE name = "'.$this->db->escapeString($name).'"
-			');
+		$query = $this->db->querySingle("
+			SELECT id FROM object_store
+			WHERE name = {$this->escape($name)}
+			");
 		
 		if (is_null($query)) {
-			$this->db->exec(
-				 ' INSERT INTO object_store (name)'
-				.' VALUES ("'.$this->db->escapeString($name).'")'
-			);
+			$this->db->exec("
+				INSERT INTO object_store (name)
+				VALUES ({$this->db->escapeString($name)})
+				");
 			$this->storageId = $this->db->lastInsertRowID();
 		} else {
 			$this->storageId = $query;
@@ -42,9 +42,29 @@ class Storage {
 	
 	public function put($object, $key=null) {
 		
+		if (is_null($key)) {
+			$sql = "INSERT INTO object_data 
+			(object_store_id, data) VALUES ( 
+				{$this->storageId},
+				{$this->escape(json_encode($object))}
+				)";
+		} else {
+			$sql = "INSERT INTO object_data 
+			(object_store_id, key_value, data) VALUES ( 
+				{$this->storageId},
+				{$this->escape($key)},
+				{$this->escape(json_encode($object))}
+				)";
+		}
+		
+		$this->db->exec($sql);
+		$object->id = $this->db->lastInsertRowID();
+		$object->key = $key;
+		
+		return $object->id;
 	}
 	
-	public function set($object, $key) {
+	public function set($object) {
 		
 	}
 	
@@ -62,5 +82,9 @@ class Storage {
 	
 	public function clear() {
 		
+	}
+	
+	private function escape($string) {
+		return "'".$this->db->escapeString($string)."'";
 	}
 }
