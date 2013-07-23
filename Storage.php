@@ -12,6 +12,10 @@ class Storage {
 	// storage id
 	private $storageId;
 	
+	/**
+	 * Open database and find storage id
+	 **/
+	
 	public function __construct($name) {
 		
 		// check library dependency
@@ -40,6 +44,10 @@ class Storage {
 		}
 	}
 	
+	/**
+	 * Save new object in storage
+	 **/
+	
 	public function put($object, $key=null) {
 		
 		if (is_null($key)) {
@@ -61,7 +69,7 @@ class Storage {
 		$object->id = $this->db->lastInsertRowID();
 		$object->key = $key;
 		
-		return $object->id;
+		return $object;
 	}
 	
 	public function set($object) {
@@ -80,8 +88,16 @@ class Storage {
 		
 	}
 	
+	/**
+	 * Delete all objects from storage
+	 **/
+	
 	public function clear() {
-		
+		$sql = "
+			DELETE FROM storage_data 
+			WHERE object_store_id = {$this->storageId}
+			";
+		return $this->db->exec($sql);
 	}
 	
 	private function escape($string) {
