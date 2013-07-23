@@ -20,4 +20,4 @@ $note->content = 'Hello World 2 !';
 $storage->set($note);
 
 // delete data
-$storage->del($id);
+$storage->del($note);
