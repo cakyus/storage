@@ -8,14 +8,15 @@ $note = new stdClass;
 $note->content = 'Hello World !';
 
 // add data into storage
-$key = $storage->put($note);
+$id = $storage->put($note);
+echo "Note-Id: ".$id."\n";
 
 // retrieve data from storage
-$note = $storage->get($key);
+$note = $storage->get($id);
 
 // updating data
 $note->content = 'Hello World 2 !';
-$storage->set($note, $key);
+$storage->set($note, $id);
 
 // delete data
-$storage->del($key);
+$storage->del($id);
