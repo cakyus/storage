@@ -126,6 +126,19 @@ class Storage {
 	
 	public function del($key) {
 		
+		if (is_null($key)) {
+			throw new \Exception("Invalid data type for \$key");
+		} elseif (is_object($key) && isset($key->id)) {
+			$key = $key->id;
+		}
+		
+		$sql = "
+			DELETE FROM object_data 
+			WHERE object_store_id = {$this->storageId}
+				AND key_value = {$this->escape($key)}
+			";
+		
+		return $this->db->exec($sql);
 	}
 	
 	public function fetch() {
@@ -138,13 +151,20 @@ class Storage {
 	
 	public function clear() {
 		$sql = "
-			DELETE FROM storage_data 
+			DELETE FROM object_data
 			WHERE object_store_id = {$this->storageId}
 			";
 		return $this->db->exec($sql);
 	}
 	
 	private function escape($string) {
-		return "'".$this->db->escapeString($string)."'";
+		
+		if (is_string($string)) {
+			return "'".$this->db->escapeString($string)."'";
+		} else {
+			throw new \Exception(
+				"Invalid data type for \$string. ".gettype($string)
+				);
+		}
 	}
 }
