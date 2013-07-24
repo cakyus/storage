@@ -6,14 +6,15 @@ include('Storage.php');
 $storage = new Storage('notes');
 $note = new stdClass;
 
+$id = uniqid();
+$note->id = $id;
 $note->content = 'Hello World !';
 
 // add data into storage
 $storage->put($note);
-echo "Note-Id: ".$note->id."\n";
 
 // retrieve data from storage
-$note = $storage->get($note->id);
+$note = $storage->get($id);
 
 // updating data
 $note->content = 'Hello World 2 !';

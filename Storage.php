@@ -23,11 +23,13 @@ class Storage {
 			throw new \Exception('SQLite3 extension is required');
 		}
 		
+		// open database
 		$this->db = new SQLite3(
 			 $_ENV['STORAGE_DATABASE']
 			,SQLITE3_OPEN_READWRITE
 			);
 		
+		// get storage id
 		$query = $this->db->querySingle("
 			SELECT id FROM object_store
 			WHERE name = {$this->escape($name)}
@@ -48,26 +50,27 @@ class Storage {
 	 * Save new object in storage
 	 **/
 	
-	public function put($object, $key=null) {
+	public function put($object) {
 		
-		if (is_null($key)) {
+		if (isset($object->id)) {
+			$key = $object->id;
+			$o = clone($object);
+			unset($o->id);
+			$sql = "INSERT INTO object_data 
+			(object_store_id, key_value, data) VALUES ( 
+				{$this->storageId},
+				{$this->escape($key)},
+				{$this->escape(json_encode($o))}
+				)";
+		} else {
 			$sql = "INSERT INTO object_data 
 			(object_store_id, data) VALUES ( 
 				{$this->storageId},
 				{$this->escape(json_encode($object))}
 				)";
-		} else {
-			$sql = "INSERT INTO object_data 
-			(object_store_id, key_value, data) VALUES ( 
-				{$this->storageId},
-				{$this->escape($key)},
-				{$this->escape(json_encode($object))}
-				)";
 		}
 		
 		$this->db->exec($sql);
-		$object->id = $this->db->lastInsertRowID();
-		$object->key = $key;
 		
 		return $object;
 	}
@@ -76,8 +79,49 @@ class Storage {
 		
 	}
 	
-	public function get($key) {
+	public function get($key, $class=null) {
 		
+		// build sql statement
+		$sql = "SELECT * FROM object_data 
+			WHERE object_store_id = {$this->storageId}
+				AND key_value = {$this->escape($key)}
+		";
+		
+		// retrive record
+		$query = $this->db->query($sql);
+		$record = $query->fetchArray(SQLITE3_ASSOC);
+		
+		// fetch object properties from record
+		$record['id'] = $record['key_value'];
+		unset($record['key_value']);
+		unset($record['object_store_id']);
+		
+		$data = $record['data'];
+		unset($record['data']);
+		
+		foreach (json_decode($data) as $name => $value) {
+			$record[$name] = $value;
+		}
+		
+		// initiate object
+		if (is_null($class)) {
+			$object = new stdClass;
+		} elseif (is_string($class)) {
+			if (in_array($class, get_declared_classes())) {
+				$object = new $class;
+			} else {
+				throw new \Exception("Undeclared class. $class");
+			}
+		} elseif (is_object($class) == false) {
+			throw new \Exception("Invalid data type for \$class");
+		}
+		
+		// assign properties to object
+		foreach ($record as $name => $value) {
+			$object->$name = $value;
+		}
+		
+		return $object;
 	}
 	
 	public function del($key) {
