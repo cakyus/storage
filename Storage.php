@@ -12,6 +12,9 @@ class Storage {
 	// storage id
 	private $storageId;
 	
+	// query handler
+	private $query;
+	
 	/**
 	 * Open database and find storage id
 	 **/
@@ -52,25 +55,29 @@ class Storage {
 	
 	public function put($object) {
 		
-		if (isset($object->id)) {
-			$key = $object->id;
-			$o = clone($object);
-			unset($o->id);
-			$sql = "INSERT INTO object_data 
-			(object_store_id, key_value, data) VALUES ( 
-				{$this->storageId},
-				{$this->escape($key)},
-				{$this->escape(json_encode($o))}
-				)";
+		$objectClone = clone($object);
+		
+		if (isset( $objectClone->id)) {
+			$key = $objectClone->id;
+			unset( $objectClone->id);			
 		} else {
-			$sql = "INSERT INTO object_data 
-			(object_store_id, data) VALUES ( 
-				{$this->storageId},
-				{$this->escape(json_encode($object))}
-				)";
+			$key = uniqid();
 		}
 		
-		$this->db->exec($sql);
+		$sql = "INSERT INTO object_data 
+		(object_store_id, key_value, data) VALUES ( 
+			{$this->storageId},
+			{$this->escape($key)},
+			{$this->escape(json_encode($objectClone))}
+			)";
+		
+		try {
+			$this->db->exec($sql);
+		} catch (\Exception $e) {
+			throw $e;
+		}
+		
+		$object->id = $key;
 		
 		return $object;
 	}
