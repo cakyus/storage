@@ -91,6 +91,29 @@ class Storage {
 	
 	public function set($object) {
 		
+		if (isset($object->id) == false) {
+			throw new \Exception("\$object must have an id");
+		}
+		
+		// get the key
+		$objectClone = clone($object);
+		$key = $objectClone->id;
+		unset($objectClone->id);
+		
+		$sql = "
+			UPDATE object_data
+			SET data = {$this->escape(json_encode($objectClone))}
+			WHERE object_store_id = {$this->storageId}
+				AND key_value = {$this->escape($key)}
+		";
+		
+		try {
+			$result = $this->db->exec($sql);
+		} catch (\Exception $e) {
+			throw $e;
+		}
+		
+		return $result;
 	}
 	
 	public function get($key, $class=null) {
