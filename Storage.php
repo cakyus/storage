@@ -53,11 +53,18 @@ class Storage {
 	 * Save new object in storage
 	 **/
 	
-	public function put($object) {
+	public function put($object, $key=null) {
 		
 		$objectClone = clone($object);
 		
-		if (isset( $objectClone->id)) {
+		if (is_null($key) == false) {
+			if (	is_string($key)
+				||	is_numeric($key)) {
+				// do nothing
+			} else {
+				throw new \Exception("Invalid data type for \$key");
+			}
+		} elseif (isset( $objectClone->id)) {
 			$key = $objectClone->id;
 			unset( $objectClone->id);			
 		} else {
@@ -145,7 +152,13 @@ class Storage {
 				AND key_value = {$this->escape($key)}
 			";
 		
-		return $this->db->exec($sql);
+		try {
+			$this->db->exec($sql);
+		} catch (\Exception $e) {
+			throw $e;
+		}
+		
+		return true;
 	}
 	
 	public function fetch() {
