@@ -170,11 +170,19 @@ class Storage {
 	 **/
 	
 	public function clear() {
+		
 		$sql = "
 			DELETE FROM object_data
 			WHERE object_store_id = {$this->storageId}
 			";
-		return $this->db->exec($sql);
+			
+		try {
+			$this->db->exec($sql);
+		} catch (\Exception $e) {
+			throw $e;
+		}
+		
+		return true;
 	}
 	
 	private function escape($string) {
