@@ -125,40 +125,14 @@ class Storage {
 		";
 		
 		// retrive record
-		$query = $this->db->query($sql);
-		$record = $query->fetchArray(SQLITE3_ASSOC);
-		
-		// fetch object properties from record
-		$record['id'] = $record['key_value'];
-		unset($record['key_value']);
-		unset($record['object_store_id']);
-		
-		$data = $record['data'];
-		unset($record['data']);
-		
-		foreach (json_decode($data) as $name => $value) {
-			$record[$name] = $value;
+		try {
+			$query = $this->db->query($sql);
+			$record = $query->fetchArray(SQLITE3_ASSOC);
+		} catch (\Exception $e) {
+			throw $e;
 		}
 		
-		// initiate object
-		if (is_null($class)) {
-			$object = new stdClass;
-		} elseif (is_string($class)) {
-			if (in_array($class, get_declared_classes())) {
-				$object = new $class;
-			} else {
-				throw new \Exception("Undeclared class. $class");
-			}
-		} elseif (is_object($class) == false) {
-			throw new \Exception("Invalid data type for \$class");
-		}
-		
-		// assign properties to object
-		foreach ($record as $name => $value) {
-			$object->$name = $value;
-		}
-		
-		return $object;
+		return $this->recordToObject($record, $class);
 	}
 	
 	public function del($key) {
@@ -186,6 +160,28 @@ class Storage {
 	
 	public function fetch() {
 		
+		if (empty($this->query)) {
+			
+			$sql = "
+				SELECT * FROM object_data
+				WHERE object_store_id = {$this->storageId}
+			";
+			
+			try {
+				$this->query = $this->db->query($sql);
+			} catch (\Exception $e) {
+				throw $e;
+			}
+		}
+		
+		
+		try {
+			$record = $this->query->fetchArray(SQLITE3_ASSOC);
+		} catch (\Exception $e) {
+			throw $e;
+		}
+		
+		return $this->recordToObject($record);;
 	}
 	
 	/**
@@ -218,4 +214,39 @@ class Storage {
 				);
 		}
 	}
+	
+	private function recordToObject($record, $class=null) {
+		
+		// fetch object properties from record
+		$record['id'] = $record['key_value'];
+		unset($record['key_value']);
+		unset($record['object_store_id']);
+		
+		$data = $record['data'];
+		unset($record['data']);
+		
+		foreach (json_decode($data) as $name => $value) {
+			$record[$name] = $value;
+		}
+		
+		// initiate object
+		if (is_null($class)) {
+			$object = new stdClass;
+		} elseif (is_string($class)) {
+			if (in_array($class, get_declared_classes())) {
+				$object = new $class;
+			} else {
+				throw new \Exception("Undeclared class. $class");
+			}
+		} elseif (is_object($class) == false) {
+			throw new \Exception("Invalid data type for \$class");
+		}
+		
+		// assign properties to object
+		foreach ($record as $name => $value) {
+			$object->$name = $value;
+		}
+		
+		return $object;
+	}	
 }
