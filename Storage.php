@@ -39,10 +39,12 @@ class Storage {
 			");
 		
 		if (is_null($query)) {
-			$this->db->exec("
+			$sql = "
 				INSERT INTO object_store (name)
-				VALUES ({$this->db->escapeString($name)})
-				");
+				VALUES ({$this->escape($name)})
+				";
+			var_dump($sql); die();
+			$this->db->exec($sql);
 			$this->storageId = $this->db->lastInsertRowID();
 		} else {
 			$this->storageId = $query;
