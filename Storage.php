@@ -43,7 +43,6 @@ class Storage {
 				INSERT INTO object_store (name)
 				VALUES ({$this->escape($name)})
 				";
-			var_dump($sql); die();
 			$this->db->exec($sql);
 			$this->storageId = $this->db->lastInsertRowID();
 		} else {
@@ -52,7 +51,16 @@ class Storage {
 	}
 	
 	/**
-	 * Save new object in storage
+	 * Add new object to storage
+	 **/
+	
+	public function add($object) {
+		
+	}
+	
+	
+	/**
+	 * Save new object or replace existing object in storage
 	 **/
 	
 	public function put($object, $key=null) {
