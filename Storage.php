@@ -54,16 +54,19 @@ class Storage {
 	 * Add new object to storage
 	 **/
 	
-	public function add($object) {
-		
+	public function add($object, $key=null) {
+		return $this->insert(false, $object, $key);
 	}
-	
 	
 	/**
 	 * Save new object or replace existing object in storage
 	 **/
 	
 	public function put($object, $key=null) {
+		return $this->insert(true, $object, $key);
+	}
+	
+	private function insert($replace=false, $object, $key) {
 		
 		$objectClone = clone($object);
 		
