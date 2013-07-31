@@ -7,4 +7,3 @@ Reserved properties
 -------------------
 
 * id  : automatically generated id
-* key : user object indentifier
