@@ -261,5 +261,47 @@ class Storage {
 		}
 		
 		return $object;
-	}	
+	}
+	
+	// == LOW LEVEL FUNCTIONS ==
+	
+	/**
+	 * Open database
+	 * 
+	 * @return boolean
+	 **/
+	
+	private function open($database, $mode) {
+		
+	}
+	
+	/**
+	 * Close database
+	 * 
+	 * @return boolean
+	 **/
+	
+	private function close() {
+		
+	}
+	
+	/**
+	 * Execute SQL statement
+	 * 
+	 * @return integer number of rows affected
+	 **/
+	
+	private function exec($sql) {
+		
+	}
+	
+	/**
+	 * Query database and fetch the result
+	 * 
+	 * @return array|boolean
+	 **/
+	
+	private function query($sql) {
+		
+	}
 }
