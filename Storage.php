@@ -26,6 +26,16 @@ class Storage {
 			throw new \Exception('SQLite3 extension is required');
 		}
 		
+		// check configuration
+		if (empty($_ENV['STORAGE_DATABASE'])) {
+			throw new \Exception('STORAGE_DATABASE should not be empty');
+		}
+		
+		// check accesibility
+		if (is_readable($_ENV['STORAGE_DATABASE'])) {
+			throw new \Exception('Read Error. '.$_ENV['STORAGE_DATABASE']);
+		}
+		
 		// open database
 		$this->db = new SQLite3(
 			 $_ENV['STORAGE_DATABASE']
@@ -268,11 +278,42 @@ class Storage {
 	/**
 	 * Open database
 	 * 
+	 * Flags:
+	 *   SQLITE3_OPEN_READONLY: Open the database for reading only.
+	 *   SQLITE3_OPEN_READWRITE: Open the database for reading and writing.
+	 *   SQLITE3_OPEN_CREATE: Create the database if it does not exist.
+	 * 
 	 * @return boolean
 	 **/
 	
-	private function open($database, $mode) {
+	private function open($table, $flags=null) {
 		
+		if (is_null($flags)) {
+			$flags = SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE;
+		}
+		
+		// open database
+		$this->db = new SQLite3(
+			 $_ENV['STORAGE_DATABASE']
+			,SQLITE3_OPEN_READWRITE
+			);
+		
+		// get storage id
+		$query = $this->db->querySingle("
+			SELECT id FROM object_store
+			WHERE name = {$this->escape($name)}
+			");
+		
+		if (is_null($query)) {
+			$sql = "
+				INSERT INTO object_store (name)
+				VALUES ({$this->escape($name)})
+				";
+			$this->db->exec($sql);
+			$this->storageId = $this->db->lastInsertRowID();
+		} else {
+			$this->storageId = $query;
+		}
 	}
 	
 	/**
@@ -282,7 +323,7 @@ class Storage {
 	 **/
 	
 	private function close() {
-		
+		return $this->db->close();
 	}
 	
 	/**
@@ -302,6 +343,6 @@ class Storage {
 	 **/
 	
 	private function query($sql) {
-		
+
 	}
 }
