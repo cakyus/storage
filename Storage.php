@@ -2,12 +2,20 @@
 
 /**
  * Simple data storage
+ * 
+ * Flags:
+ *   SQLITE3_OPEN_READONLY
+ *   SQLITE3_OPEN_READWRITE
+ *   SQLITE3_OPEN_CREATE
  **/
 
 class Storage {
 	
 	// database handler
 	private $db;
+	
+	// storage name
+	private $storageName;
 	
 	// storage id
 	private $storageId;
@@ -26,23 +34,13 @@ class Storage {
 			throw new \Exception('SQLite3 extension is required');
 		}
 		
-		// check configuration
-		if (empty($_ENV['STORAGE_DATABASE'])) {
-			throw new \Exception('STORAGE_DATABASE should not be empty');
-		}
+		$this->storageName = $name;
 		
-		// check accesibility
-		if (is_readable($_ENV['STORAGE_DATABASE'])) {
-			throw new \Exception('Read Error. '.$_ENV['STORAGE_DATABASE']);
-		}
-		
-		// open database
 		$this->db = new SQLite3(
-			 $_ENV['STORAGE_DATABASE']
-			,SQLITE3_OPEN_READWRITE
+			  $_ENV['STORAGE_DATABASE']
+			, SQLITE3_OPEN_READWRITE
 			);
-		
-		// get storage id
+			
 		$query = $this->db->querySingle("
 			SELECT id FROM object_store
 			WHERE name = {$this->escape($name)}
@@ -102,7 +100,7 @@ class Storage {
 			)";
 		
 		try {
-			$this->db->exec($sql);
+			$this->exec($sql);
 		} catch (\Exception $e) {
 			throw $e;
 		}
@@ -227,10 +225,18 @@ class Storage {
 		return true;
 	}
 	
+	/**
+	 * Returns a string that has been properly escaped
+	 * 
+	 * @return string
+	 **/
+	
 	private function escape($string) {
 		
+		$db = new SQLite3(':memory:');
+		
 		if (is_string($string)) {
-			return "'".$this->db->escapeString($string)."'";
+			return "'".$db->escapeString($string)."'";
 		} else {
 			throw new \Exception(
 				"Invalid data type for \$string. ".gettype($string)
@@ -274,75 +280,63 @@ class Storage {
 	}
 	
 	// == LOW LEVEL FUNCTIONS ==
-	
 	/**
-	 * Open database
+	 * Execute SQL statement that changes data or schema in database
 	 * 
-	 * Flags:
-	 *   SQLITE3_OPEN_READONLY: Open the database for reading only.
-	 *   SQLITE3_OPEN_READWRITE: Open the database for reading and writing.
-	 *   SQLITE3_OPEN_CREATE: Create the database if it does not exist.
+	 * @param $sql   sql statement
+	 * @param $fetch retrieve record from the result
 	 * 
-	 * @return boolean
+	 * @return integer number of rows affected
 	 **/
 	
-	private function open($table, $flags=null) {
+	private function exec(
+		  $sql
+		, $fetch=false
+		) {
 		
-		if (is_null($flags)) {
-			$flags = SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE;
+		// configure database
+		$databasePath  = $_ENV['STORAGE_DATABASE'];
+		
+		if ($fetch) {
+			$databaseFlags = SQLITE3_OPEN_READONLY;
+		} else {
+			$databaseFlags = SQLITE3_OPEN_READWRITE;
 		}
 		
+		// configure storage
+		$storageId     = null;
+		$storageName   = $this->storageName;
+		
 		// open database
-		$this->db = new SQLite3(
-			 $_ENV['STORAGE_DATABASE']
-			,SQLITE3_OPEN_READWRITE
-			);
+		$database = new SQLite3($databasePath, $databaseFlags);
 		
 		// get storage id
-		$query = $this->db->querySingle("
+		$query = $database->querySingle("
 			SELECT id FROM object_store
-			WHERE name = {$this->escape($name)}
+			WHERE name = {$this->escape($storageName)}
 			");
 		
 		if (is_null($query)) {
 			$sql = "
 				INSERT INTO object_store (name)
-				VALUES ({$this->escape($name)})
+				VALUES ({$this->escape($storageName)})
 				";
-			$this->db->exec($sql);
-			$this->storageId = $this->db->lastInsertRowID();
+			$database->exec($sql);
+			$storageId = $database->lastInsertRowID();
 		} else {
-			$this->storageId = $query;
+			$storageId = $query;
 		}
-	}
-	
-	/**
-	 * Close database
-	 * 
-	 * @return boolean
-	 **/
-	
-	private function close() {
-		return $this->db->close();
-	}
-	
-	/**
-	 * Execute SQL statement
-	 * 
-	 * @return integer number of rows affected
-	 **/
-	
-	private function exec($sql) {
 		
-	}
-	
-	/**
-	 * Query database and fetch the result
-	 * 
-	 * @return array|boolean
-	 **/
-	
-	private function query($sql) {
-
+		// execute sql statement
+		try {
+			$query = $database->exec($sql);
+		} catch (\Exception $e) {
+			throw new \Exception($e->getMessage().' '.$sql);
+		}
+		
+		$database->close();
+		unset($database);
+		
+		return $query;
 	}
 }
