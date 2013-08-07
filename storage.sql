@@ -8,6 +8,7 @@ CREATE TABLE object_data (
 	  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
 	, object_store_id INTEGER NOT NULL
 	, key_value BLOB DEFAULT NULL
+	, class_name BLOB NOT NULL
 	, data BLOB NOT NULL
 	, UNIQUE (object_store_id, key_value)
 );

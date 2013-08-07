@@ -13,6 +13,7 @@ class Storage {
 	
 	// database handler
 	private $db;
+	private $database;
 	
 	// storage name
 	private $storageName;
@@ -77,8 +78,10 @@ class Storage {
 	private function insert($replace=false, $object, $key) {
 		
 		$objectClone = clone($object);
+		$className   = get_class($object);
 		
 		if (is_null($key) == false) {
+			// a key must be string or numeric
 			if (	is_string($key)
 				||	is_numeric($key)) {
 				// do nothing
@@ -87,27 +90,25 @@ class Storage {
 			}
 		} elseif (isset( $objectClone->id)) {
 			$key = $objectClone->id;
-			unset( $objectClone->id);			
 		} else {
 			$key = uniqid();
 		}
 		
+		unset($object->id);
+		unset($objectClone->id);
+		
 		$sql = "INSERT INTO object_data 
-		(object_store_id, key_value, data) VALUES ( 
+		(object_store_id, key_value, class_name, data) VALUES ( 
 			{$this->storageId},
 			{$this->escape($key)},
+			{$this->escape($className)},
 			{$this->escape(json_encode($objectClone))}
 			)";
 		
-		try {
-			$this->exec($sql);
-		} catch (\Exception $e) {
-			throw $e;
-		}
-		
+		$query = $this->exec($sql);
 		$object->id = $key;
 		
-		return $object;
+		return $query;
 	}
 	
 	public function set($object) {
@@ -118,8 +119,10 @@ class Storage {
 		
 		// get the key
 		$objectClone = clone($object);
+		
 		$key = $objectClone->id;
 		unset($objectClone->id);
+		unset($objectClone->class_name);
 		
 		$sql = "
 			UPDATE object_data
@@ -128,16 +131,10 @@ class Storage {
 				AND key_value = {$this->escape($key)}
 		";
 		
-		try {
-			$result = $this->db->exec($sql);
-		} catch (\Exception $e) {
-			throw $e;
-		}
-		
-		return $result;
+		return $this->exec($sql);
 	}
 	
-	public function get($key, $class=null) {
+	public function get($key) {
 		
 		// build sql statement
 		$sql = "SELECT * FROM object_data 
@@ -145,23 +142,16 @@ class Storage {
 				AND key_value = {$this->escape($key)}
 		";
 		
-		// retrive record
-		try {
-			$query = $this->db->query($sql);
-			$record = $query->fetchArray(SQLITE3_ASSOC);
-		} catch (\Exception $e) {
-			throw $e;
-		}
-		
-		return $this->recordToObject($record, $class);
+		// get object		
+		return $this->querySingle($sql, true);
 	}
 	
-	public function del($key) {
+	public function del($object) {
 		
-		if (is_null($key)) {
+		if (is_object($object) && isset($object->id)) {
+			$key = $object->id;
+		} else {
 			throw new \Exception("Invalid data type for \$key");
-		} elseif (is_object($key) && isset($key->id)) {
-			$key = $key->id;
 		}
 		
 		$sql = "
@@ -171,13 +161,17 @@ class Storage {
 			";
 		
 		try {
-			$this->db->exec($sql);
+			$this->exec($sql);
 		} catch (\Exception $e) {
 			throw $e;
 		}
 		
 		return true;
 	}
+	
+	/**
+	 * @todo
+	 **/
 	
 	public function fetch() {
 		
@@ -207,6 +201,8 @@ class Storage {
 	
 	/**
 	 * Delete all objects from storage
+	 * 
+	 * @return number of affected rows
 	 **/
 	
 	public function clear() {
@@ -215,14 +211,8 @@ class Storage {
 			DELETE FROM object_data
 			WHERE object_store_id = {$this->storageId}
 			";
-			
-		try {
-			$this->db->exec($sql);
-		} catch (\Exception $e) {
-			throw $e;
-		}
 		
-		return true;
+		return $this->exec($sql);
 	}
 	
 	/**
@@ -233,10 +223,11 @@ class Storage {
 	
 	private function escape($string) {
 		
-		$db = new SQLite3(':memory:');
+		// dummy database instance
+		$database = new SQLite3(':memory:');
 		
 		if (is_string($string)) {
-			return "'".$db->escapeString($string)."'";
+			return "'".$database->escapeString($string)."'";
 		} else {
 			throw new \Exception(
 				"Invalid data type for \$string. ".gettype($string)
@@ -244,10 +235,15 @@ class Storage {
 		}
 	}
 	
-	private function recordToObject($record, $class=null) {
+	/**
+	 * @depreciated
+	 **/
+	
+	private function recordToObject($record) {
 		
 		// fetch object properties from record
 		$record['id'] = $record['key_value'];
+		$class = $record['class_name'];
 		unset($record['key_value']);
 		unset($record['object_store_id']);
 		
@@ -259,15 +255,13 @@ class Storage {
 		}
 		
 		// initiate object
-		if (is_null($class)) {
-			$object = new stdClass;
-		} elseif (is_string($class)) {
+		if (is_string($class)) {
 			if (in_array($class, get_declared_classes())) {
 				$object = new $class;
 			} else {
-				throw new \Exception("Undeclared class. $class");
+				throw new \Exception("Undefined class. $class");
 			}
-		} elseif (is_object($class) == false) {
+		} else {
 			throw new \Exception("Invalid data type for \$class");
 		}
 		
@@ -280,38 +274,108 @@ class Storage {
 	}
 	
 	// == LOW LEVEL FUNCTIONS ==
+	
 	/**
 	 * Execute SQL statement that changes data or schema in database
 	 * 
 	 * @param $sql   sql statement
-	 * @param $fetch retrieve record from the result
-	 * 
 	 * @return integer number of rows affected
 	 **/
 	
-	private function exec(
-		  $sql
-		, $fetch=false
-		) {
+	private function exec($sql) {
 		
-		// configure database
-		$databasePath  = $_ENV['STORAGE_DATABASE'];
+		$this->open(SQLITE3_OPEN_READWRITE);
 		
-		if ($fetch) {
-			$databaseFlags = SQLITE3_OPEN_READONLY;
-		} else {
-			$databaseFlags = SQLITE3_OPEN_READWRITE;
+		// execute sql statement
+		try {
+			$query = $this->database->exec($sql);
+		} catch (\Exception $e) {
+			throw new \Exception($e->getMessage().' '.$sql);
 		}
 		
-		// configure storage
-		$storageId     = null;
-		$storageName   = $this->storageName;
+		$this->close();
 		
-		// open database
-		$database = new SQLite3($databasePath, $databaseFlags);
+		return $query;
+	}
+	
+	/**
+	 * Execute SQL statement and return the result
+	 * 
+	 * @param $sql The SQL query to execute.
+	 * @param $entireRow By default, querySingle() returns 
+	 *        the value of the first column returned by the query. 
+	 *        If entire_row is TRUE, then it returns an object of 
+	 *        the entire first row.
+	 * @return object
+	 **/
+	
+	private function querySingle($sql, $entireRow=false) {
+		
+		$this->open(SQLITE3_OPEN_READONLY);
+		
+		try {
+			$query = $this->database->querySingle($sql, $entireRow);
+		} catch (\Exception $e) {
+			throw $e;
+		}
+		
+		$this->close();
+		
+		if ($entireRow == false) {
+			return $query;
+		} else {
+			$record = $query;
+		}
+		
+		// fetch object properties from record
+		$record['id'] = $record['key_value'];
+		$class = $record['class_name'];
+		unset($record['key_value']);
+		unset($record['object_store_id']);
+		unset($record['class_name']);
+		
+		$data = $record['data'];
+		unset($record['data']);
+		
+		foreach (json_decode($data) as $name => $value) {
+			$record[$name] = $value;
+		}
+		
+		// initiate object
+		if (is_string($class)) {
+			if (in_array($class, get_declared_classes())) {
+				$object = new $class;
+			} else {
+				throw new \Exception("Undefined class. $class");
+			}
+		} else {
+			throw new \Exception("Invalid data type for \$class");
+		}
+		
+		// assign properties to object
+		foreach ($record as $name => $value) {
+			$object->$name = $value;
+		}
+		
+		return $object;
+	}
+	
+	/**
+	 * Open database instance and register storage
+	 * 
+	 * @return void
+	 **/
+	
+	private function open($flags) {
+		
+		$file = $_ENV['STORAGE_DATABASE'];
+		$storageName = $this->storageName;
+		
+		// create database instance
+		$this->database = new SQLite3($file, $flags);
 		
 		// get storage id
-		$query = $database->querySingle("
+		$query = $this->database->querySingle("
 			SELECT id FROM object_store
 			WHERE name = {$this->escape($storageName)}
 			");
@@ -321,22 +385,21 @@ class Storage {
 				INSERT INTO object_store (name)
 				VALUES ({$this->escape($storageName)})
 				";
-			$database->exec($sql);
-			$storageId = $database->lastInsertRowID();
+			$this->database->exec($sql);
+			$this->storageId = $this->database->lastInsertRowID();
 		} else {
-			$storageId = $query;
+			$this->storageId = $query;
 		}
-		
-		// execute sql statement
-		try {
-			$query = $database->exec($sql);
-		} catch (\Exception $e) {
-			throw new \Exception($e->getMessage().' '.$sql);
-		}
-		
-		$database->close();
-		unset($database);
-		
-		return $query;
+	}
+	
+	/**
+	 * Close database instance
+	 * 
+	 * @return void
+	 **/
+	
+	private function close() {
+		$this->database->close();
+		$this->database = null;
 	}
 }
