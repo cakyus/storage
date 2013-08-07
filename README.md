@@ -3,7 +3,8 @@ Simple Storage
 
 Simple utility to store object in an sqlite database.
 
-Reserved properties
--------------------
-
-* id  : automatically generated id
+Install
+-------
+	
+	# create storage database
+    $ sqlite3 storage.sqlite < storage.sql
