@@ -74,16 +74,17 @@ class Storage {
 		
 		unset($object->id);
 		unset($objectClone->id);
+		
+		$this->open(SQLITE3_OPEN_READWRITE);
 				
-		$sql = "INSERT INTO object_data 
+		$query = $this->exec("INSERT INTO object_data 
 		(object_store_id, key_value, class_name, data) VALUES ( 
 			{$this->storageId},
 			{$this->escape($key)},
 			{$this->escape($className)},
 			{$this->escape(json_encode($objectClone))}
-			)";
+			)");
 		
-		$query = $this->exec($sql);
 		$object->id = $key;
 		
 		return $query;
@@ -102,26 +103,24 @@ class Storage {
 		unset($objectClone->id);
 		unset($objectClone->class_name);
 		
-		$sql = "
+		$this->open(SQLITE3_OPEN_READWRITE);
+		
+		return $this->exec("
 			UPDATE object_data
 			SET data = {$this->escape(json_encode($objectClone))}
 			WHERE object_store_id = {$this->storageId}
 				AND key_value = {$this->escape($key)}
-		";
-		
-		return $this->exec($sql);
+			");
 	}
 	
 	public function get($key) {
 		
-		// build sql statement
-		$sql = "SELECT * FROM object_data 
+		$this->open(SQLITE3_OPEN_READONLY);
+		
+		return $this->querySingle("SELECT * FROM object_data 
 			WHERE object_store_id = {$this->storageId}
 				AND key_value = {$this->escape($key)}
-		";
-		
-		// get object		
-		return $this->querySingle($sql, true);
+			", true);
 	}
 	
 	public function del($object) {
@@ -132,19 +131,13 @@ class Storage {
 			throw new \Exception("Invalid data type for \$key");
 		}
 		
-		$sql = "
+		$this->open(SQLITE3_OPEN_READWRITE);
+		
+		return $this->exec("
 			DELETE FROM object_data 
 			WHERE object_store_id = {$this->storageId}
 				AND key_value = {$this->escape($key)}
-			";
-		
-		try {
-			$this->exec($sql);
-		} catch (\Exception $e) {
-			throw $e;
-		}
-		
-		return true;
+			");
 	}
 	
 	/**
@@ -185,12 +178,12 @@ class Storage {
 	
 	public function clear() {
 		
-		$sql = "
+		$this->open(SQLITE3_OPEN_READWRITE);
+		
+		return $this->exec("
 			DELETE FROM object_data
 			WHERE object_store_id = {$this->storageId}
-			";
-		
-		return $this->exec($sql);
+			");
 	}
 	
 	/**
@@ -213,44 +206,6 @@ class Storage {
 		}
 	}
 	
-	/**
-	 * @depreciated
-	 **/
-	
-	private function recordToObject($record) {
-		
-		// fetch object properties from record
-		$record['id'] = $record['key_value'];
-		$class = $record['class_name'];
-		unset($record['key_value']);
-		unset($record['object_store_id']);
-		
-		$data = $record['data'];
-		unset($record['data']);
-		
-		foreach (json_decode($data) as $name => $value) {
-			$record[$name] = $value;
-		}
-		
-		// initiate object
-		if (is_string($class)) {
-			if (in_array($class, get_declared_classes())) {
-				$object = new $class;
-			} else {
-				throw new \Exception("Undefined class. $class");
-			}
-		} else {
-			throw new \Exception("Invalid data type for \$class");
-		}
-		
-		// assign properties to object
-		foreach ($record as $name => $value) {
-			$object->$name = $value;
-		}
-		
-		return $object;
-	}
-	
 	// == LOW LEVEL FUNCTIONS ==
 	
 	/**
@@ -262,7 +217,7 @@ class Storage {
 	
 	private function exec($sql) {
 		
-		$this->open(SQLITE3_OPEN_READWRITE);
+		//$this->open(SQLITE3_OPEN_READWRITE);
 		
 		// execute sql statement
 		try {
@@ -289,7 +244,7 @@ class Storage {
 	
 	private function querySingle($sql, $entireRow=false) {
 		
-		$this->open(SQLITE3_OPEN_READONLY);
+		//$this->open(SQLITE3_OPEN_READONLY);
 		
 		try {
 			$query = $this->database->querySingle($sql, $entireRow);
