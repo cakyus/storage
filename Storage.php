@@ -12,7 +12,6 @@
 class Storage {
 	
 	// database handler
-	private $db;
 	private $database;
 	
 	// storage name
@@ -36,27 +35,6 @@ class Storage {
 		}
 		
 		$this->storageName = $name;
-		
-		$this->db = new SQLite3(
-			  $_ENV['STORAGE_DATABASE']
-			, SQLITE3_OPEN_READWRITE
-			);
-			
-		$query = $this->db->querySingle("
-			SELECT id FROM object_store
-			WHERE name = {$this->escape($name)}
-			");
-		
-		if (is_null($query)) {
-			$sql = "
-				INSERT INTO object_store (name)
-				VALUES ({$this->escape($name)})
-				";
-			$this->db->exec($sql);
-			$this->storageId = $this->db->lastInsertRowID();
-		} else {
-			$this->storageId = $query;
-		}
 	}
 	
 	/**
@@ -96,7 +74,7 @@ class Storage {
 		
 		unset($object->id);
 		unset($objectClone->id);
-		
+				
 		$sql = "INSERT INTO object_data 
 		(object_store_id, key_value, class_name, data) VALUES ( 
 			{$this->storageId},
@@ -349,7 +327,10 @@ class Storage {
 				throw new \Exception("Undefined class. $class");
 			}
 		} else {
-			throw new \Exception("Invalid data type for \$class");
+			throw new \Exception(
+				"Invalid data type for \$class. "
+				.gettype($class)
+				);
 		}
 		
 		// assign properties to object
